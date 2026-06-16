@@ -22,7 +22,8 @@ enum RestartPolicy
 
 struct AppConfig
 {
-  std::string name;
+  std::string executable;
+  std::vector<std::string> args;
   RestartPolicy policy;
 };
 
@@ -136,47 +137,81 @@ public:
   // =======================
   // Process Management
   // =======================
-  pid_t startProcess(const AppConfig& app)
+  static std::vector<std::string> ParseArgs(std::string const & args_text)
+  {
+    std::vector<std::string> args;
+    std::istringstream stream{args_text};
+    std::string token;
+    while (stream >> token) {
+      args.push_back(token);
+    }
+    return args;
+  }
+
+  static std::string DescribeApp(AppConfig const & app)
+  {
+    std::ostringstream description;
+    description << app.executable;
+    for (auto const & arg : app.args) {
+      description << ' ' << arg;
+    }
+    return description.str();
+  }
+
+  pid_t startProcess(AppConfig const & app)
   {
     pid_t pid = fork();
 
     if (pid == 0)
     {
-      execl(app.name.c_str(), app.name.c_str(), NULL);
+      std::vector<char *> argv;
+      argv.push_back(const_cast<char *>(app.executable.c_str()));
+      for (auto const & arg : app.args) {
+        argv.push_back(const_cast<char *>(arg.c_str()));
+      }
+      argv.push_back(nullptr);
+
+      execv(app.executable.c_str(), argv.data());
+      perror("execv failed");
       exit(1);
     }
 
     pidMap[pid] = app;
 
-    log("Started " + app.name + " PID=" + std::to_string(pid));
+    log("Started " + DescribeApp(app) + " PID=" + std::to_string(pid));
 
     return pid;
   }
 
-  void launchAllApps()
+  void launchAllApps(std::string const & config_path)
   {
     pugi::xml_document document;
 
     try
     {
-      if(document.load_file("./config-example.xml"))
+      if (document.load_file(config_path.c_str()))
       {
         auto apps = document.select_node("/configuration/applications").node();
-        for(auto const& app : apps.children())
-        {
-          std::string app_name = app.attribute("name").as_string();
-          RestartPolicy policy = static_cast<RestartPolicy>(app.attribute("policy").as_int());
+        for (auto const & app : apps.children()) {
+          std::string const executable = app.attribute("name").as_string();
+          std::string const args_text = app.attribute("args").as_string();
+          RestartPolicy const policy =
+            static_cast<RestartPolicy>(app.attribute("policy").as_int());
 
-          std::cerr << app_name << "  : " << policy << "\n";
-          AppConfig app_config{app_name, policy};
+          AppConfig app_config{
+            executable,
+            ParseArgs(args_text),
+            policy};
+
+          std::cerr << DescribeApp(app_config) << " : " << policy << "\n";
           startProcess(app_config);
           sleep(3);
         }
       }
     }
-    catch(...)
+    catch (...)
     {
-      std::cerr << "Error loading the file.\n";
+      std::cerr << "Error loading config: " << config_path << "\n";
     }
   }
 
@@ -289,10 +324,10 @@ public:
   // =======================
   // Loop & Cleanup
   // =======================
-  void run()
+  void run(std::string const & config_path)
   {
     setupSignals();
-    launchAllApps();
+    launchAllApps(config_path);
 
     while (running)
     {
@@ -327,10 +362,13 @@ ProcessManager* ProcessManager::instance = nullptr;
 // =======================
 // MAIN
 // =======================
-int main()
+int main(int argc, char * argv[])
 {
+  std::string const config_path =
+    (argc >= 2) ? argv[1] : "./config-example.xml";
+
   ProcessManager manager;
-  manager.run();
+  manager.run(config_path);
 
   return 0;
 }

@@ -4,5 +4,11 @@
     <applications>
         <app name="/app/ros2_ws/install/demo_to_cat/lib/demo_to_cat/app_pub" policy="0"/>
         <app name="/app/ros2_ws/install/demo_to_cat/lib/demo_to_cat/app_sub" policy="0"/>
+        <app name="/app/ros2_ws/install/cat_apps/lib/cat_apps/BaselineSubscriber"
+             args="/app/ros2_ws/install/cat_apps/share/cat_apps/config-example.xml"
+             policy="0"/>
+        <app name="/app/ros2_ws/install/cat_apps/lib/cat_apps/BaselinePublisher"
+             args="0 /app/ros2_ws/install/cat_apps/share/cat_apps/config-example.xml"
+             policy="0"/>
     </applications>
 </configuration>

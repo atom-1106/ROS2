@@ -25,6 +25,11 @@ target_link_libraries(launcher
 
 install(FILES
   src/config-example.xml
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(FILES
+  src/config-example.xml
   DESTINATION lib/${PROJECT_NAME}
 )
 
