@@ -5,24 +5,37 @@
 #   docker exec -it GuestOS-Base-${USER} bash /app/ros2_ws/scripts/build-and-test-baseline.sh
 #
 # Or inside the container:
-#   cd /app/ros2_ws && ./scripts/build-and-test-baseline.sh
+#   cd /app/ros2_ws && bash scripts/build-and-test-baseline.sh
 #
 # Build only (skip smoke test):
-#   RUN_SMOKE_TEST=0 ./scripts/build-and-test-baseline.sh
+#   RUN_SMOKE_TEST=0 bash scripts/build-and-test-baseline.sh
+#
+# Skip clean before build (faster incremental rebuild):
+#   CLEAN_BUILD=0 bash scripts/build-and-test-baseline.sh
 
-set -euo pipefail
+set -eo pipefail
 
 WORKSPACE="/app/ros2_ws"
 PACKAGES="cat_msgs pugixml cat_apps process_launcher"
 RUN_SMOKE_TEST="${RUN_SMOKE_TEST:-1}"
+CLEAN_BUILD="${CLEAN_BUILD:-1}"
 
 cd "${WORKSPACE}"
 
 echo "=== Sourcing ROS2 Jazzy ==="
+# Do not use 'set -u' in this script: ROS setup.bash reads optional AMENT_* vars.
 source /opt/ros/jazzy/setup.bash
 
+if [[ "${CLEAN_BUILD}" == "1" ]]; then
+  echo "=== Cleaning previous build/install for: ${PACKAGES} ==="
+  for pkg in ${PACKAGES}; do
+    rm -rf "build/${pkg}" "install/${pkg}"
+  done
+fi
+
 echo "=== Building packages: ${PACKAGES} ==="
-colcon build --packages-select ${PACKAGES} --symlink-install
+# Avoid --symlink-install: breaks cat_msgs ament_cmake_python on Docker bind mounts (Windows host).
+colcon build --packages-select ${PACKAGES}
 
 echo "=== Sourcing workspace ==="
 source install/setup.bash

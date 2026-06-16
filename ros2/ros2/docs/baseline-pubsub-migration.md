@@ -503,7 +503,7 @@ docker exec -it GuestOS-Base-${USER} bash -c 'RUN_SMOKE_TEST=0 /app/ros2_ws/scri
 # Inside GuestOS-Base docker container
 cd /app/ros2_ws
 source /opt/ros/jazzy/setup.bash
-colcon build --packages-select cat_msgs pugixml cat_apps process_launcher --symlink-install
+colcon build --packages-select cat_msgs pugixml cat_apps process_launcher
 source install/setup.bash
 ```
 
@@ -658,9 +658,11 @@ source /app/ros2_ws/install/setup.bash
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | No messages received | Publisher not running | Start publisher or use `ros2 launch cat_apps baseline_pubsub.launch.yaml` |
-| Build fails / stale artifacts | Old CMake cache | Clean build: `rm -rf build/cat_apps install/cat_apps` then rebuild |
+| Build fails / stale artifacts | Old CMake cache | Clean build: `rm -rf build/cat_msgs install/cat_msgs` (or run smoke script which cleans by default) |
+| `cat_msgs` symlink / `Is a directory` | Stale build + `--symlink-install` on Docker/Windows mount | `rm -rf build/cat_msgs install/cat_msgs`; use `bash scripts/build-and-test-baseline.sh` (no symlink-install) |
 | Config parse error | Wrong XML schema | Use original `<parameter name min max>` format |
 | `ros2 run` not found | Workspace not sourced | `source install/setup.bash` |
+| `AMENT_*: unbound variable` when running smoke script | `set -u` conflicts with ROS setup.bash | Use `bash scripts/build-and-test-baseline.sh` (script uses `set -eo pipefail` without `-u`) |
 | No match logs | Normal at startup — wait briefly | DDS discovery takes ~1 s |
 
 ---
