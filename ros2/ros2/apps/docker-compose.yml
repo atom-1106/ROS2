@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  GuestOS-Base:
+    image: ros:jazzy-ros-base
+    container_name: "GuestOS-Base-${USER}"
+    hostname: "GuestOS-Base-${USER}"
+    command: "sleep infinity"
+    working_dir: /app/ros2_ws
+    volumes:
+      - ./:/app/ros2_ws
+    networks:
+      - net
+
+  # GuestOS-Core:
+  #   image: ros:jazzy-ros-core
+  #   container_name: "GuestOS-Core-${USER}"
+  #   hostname: "GuestOS-Core-${USER}"
+  #   command: "sleep infinity"
+  #   working_dir: /app/ros2_ws
+  #   volumes:
+  #     - ./:/app/ros2_ws
+  #   networks:
+  #     - net
+
+  # GuestOS-Cust:
+  #   image: ros2-cust-jazzy:latest
+  #   container_name: "GuestOS-Cust-${USER}"
+  #   hostname: "GuestOS-Cust-${USER}"
+  #   command: "sleep infinity"
+  #   working_dir: /app/ros2_ws
+  #   volumes:
+  #     - ./:/app/ros2_ws
+  #   networks:
+  #     - net
+
+networks:
+  net:
+    driver: bridge
+    name: "GuestOS-${USER}-Network"

@@ -1,0 +1,4 @@
+struct Message {
+	string additional_information;
+	sequence<octet> protobuf;
+};

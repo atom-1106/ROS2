@@ -1,0 +1,230 @@
+@startuml Testable MessageParticipant
+header
+    <font color=red>Copyright (C) Caterpillar Inc. All rights reserved</font>
+    File name: MessageParticipant.puml
+    Description: This file contains designs for MessageParticipant class.
+endheader
+
+
+'!pragma layout smetana
+'top to bottom direction
+skinparam linetype ortho
+
+skinparam class {
+	BackgroundColor<<Changed>> LightGreen
+	BackgroundColor<<New>> LightBlue
+	BackgroundColor<<Removed>> LightPink
+	BackgroundColor<<Future>> LightGray
+}
+
+skinparam interface {
+	BackgroundColor<<Changed>> LightGreen
+	BackgroundColor<<New>> LightBlue
+	BackgroundColor<<Removed>> LightPink
+	BackgroundColor<<Future>> LightGray
+}
+
+
+!define SHOW_MESSAGE_READER
+!define SHOW_MESSAGE_WRITER
+
+title Testable MessageParticipant
+
+namespace eprosima {
+
+    class DomainParticipantFactory <<static>> {
+        create_participant(...)
+    }
+    class TypeSupport
+
+    together {
+        class DomainParticipant {
+            create_topic(...)
+            delete_topic(topic)
+        }
+        class Subscriber
+        class Publisher
+        class Topic
+    }
+
+    together {
+        class DataReaderQos
+        class DataReader {
+            take_next_sample(message, info) : retcode
+        }
+        interface DataReaderListener {
+            +on_subscription_matched(::eprosima::DataReader* pReader, info) : void
+            +on_data_available(::eprosima::DataReader* pReader)
+        }
+    }
+
+    together {
+        class DataWriterQos
+        class DataWriter {
+            write(message) : retcode
+        }
+        interface DataWriterListener {
+            +on_publication_matched(::eprosima::DataWriter* pWriter, info) : void
+        }
+    }
+
+
+    DomainParticipantFactory ..> DomainParticipant : "C"
+    DomainParticipant -- TypeSupport
+    DomainParticipant ..> Topic : "C"
+    DomainParticipant ..> Subscriber : "C"
+    DomainParticipant ..> Publisher : "C"
+    Publisher ..> DataWriter : "C"
+    Subscriber ..> DataReader : "C"
+    DataReader o-- DataReaderListener
+    DataReader *-- DataReaderQos
+    Publisher o-- DataWriterListener
+    DataWriter *-- DataWriterQos
+    DataReader o-- Topic
+    DataWriter o-- Topic
+
+}
+
+
+interface IDomainParticipantStub <<New>> {
+    + string Name()
+    + uint32_t MulticastListeningLocatorPort()
+    + std::unique_ptr<IMiddlewareReader> CreateReader(topic_name, qos, on_subscription, on_disconnect)
+    + std::unique_ptr<IMiddlewareWriter> CreateWriter(topic_name, qos)
+
+}
+class DomainParticipantMessageStub <<New>> {
+    + DomainParticipantMessageStub(domain_id, name)
+}
+class MessageReader_Create {
+    <<static>> Create(topic_name, pDomainParticipant, pSubscriber, topicSupportType, qos, on_subscription, on_disconnect)
+}
+class MessageWriter_Create {
+    <<static>> Create(topic_name, pDomainParticipant, pPublisher, topicSupportType, qos)
+}
+
+IDomainParticipantStub <|-- DomainParticipantMessageStub
+DomainParticipantMessageStub -- MessageReader_Create
+DomainParticipantMessageStub -- MessageWriter_Create
+DomainParticipantMessageStub -- DomainParticipantFactory
+
+DomainParticipantMessageStub *-- DomainParticipant
+DomainParticipantMessageStub *-- TypeSupport
+DomainParticipantMessageStub *-- Subscriber
+DomainParticipantMessageStub *-- Publisher
+
+class MessageParticipant <<Changed>> {
+    MessageParticipant(domain_id, name)
+    CreateReader(topicName, on_subscription, on_disconnect) : unique_ptr<IMiddlewareReader>
+    CreateWriter(topicName) : unique_ptr<IMiddlewareWriter>
+    --Changed--
+    MessageParticipant(unique_ptr<IDomainParticipantStub>)
+}
+MessageParticipant *-- IDomainParticipantStub
+MessageParticipant ..> DataReaderQos : "C"
+MessageParticipant ..> DataWriterQos : "C"
+
+class FrameworkFactory <<static>> {
+    CreateMessageParticipant(id, name) : unique_ptr<IMiddlewareParticipant>
+    CreateClientParticipant(id, name, sources) : unique_ptr<IMiddlewareClient>
+    CreateServerParticipant(id, name, callback) : unique_ptr<IMiddlewareServer>
+}
+
+FrameworkFactory ..> DomainParticipantMessageStub : "C"
+FrameworkFactory ..> MessageParticipant : "C"
+
+
+!if SHOW_MESSAGE_READER
+
+interface IDataReaderStub {
+    +ReturnCode_t TakeNextSample(void* pMessage, SampleInfo* pInfo)
+}
+
+class DataReaderStub
+IDataReaderStub <|-- DataReaderStub
+
+DataReaderStub *-- Topic
+DataReaderStub *-- DataReader
+DataReaderStub *-- DataReaderListener
+
+interface IMiddlewareReader {
+    +ConnectedToPublisher()
+    OnSubscriptionMatched(bool const)
+    OnDataAvailable()
+}
+
+MessageReader_Create ..> MessageReader : "C"
+MessageReader_Create ..> DataReaderStub : "C"
+MessageReader_Create ..> MiddlewareDataReaderListener : "C"
+
+class MessageReader {
+    + MessageReader(topic_name, on_subscription, on_disconnect)
+    + void SetDependency(std::unique_ptr<IDataReaderStub>&& spDataReader)
+
+}
+
+MessageReader ..|> IMiddlewareReader
+
+DataReaderStub o-- DomainParticipant
+DataReaderStub o-- Subscriber
+
+MessageReader_Create -- DomainParticipant
+MessageReader_Create -- Subscriber
+MessageReader_Create -- TypeSupport
+MessageReader_Create -- DataReaderQos
+MessageReader *-- IDataReaderStub
+
+class MiddlewareDataReaderListener {
+    + void SetDependency(::middleware::IMiddlewareReader* pMiddlewareReader)
+}
+MiddlewareDataReaderListener ..|> DataReaderListener
+MiddlewareDataReaderListener o-- IMiddlewareReader
+!endif
+
+!if SHOW_MESSAGE_WRITER
+interface IDataWriterStub <<New>> {
+    +ReturnCode_t Write(void* pMessage)
+}
+
+class DataWriterStub <<New>>
+IDataWriterStub <|-- DataWriterStub
+
+DataWriterStub *-- Topic
+DataWriterStub *-- DataWriter
+DataWriterStub *-- DataWriterListener
+
+interface IMiddlewareWriter {
+	+bool ConnectedToSubscriber()
+	+bool Publish(::google::protobuf::Message const& message)
+	+bool Publish(std::vector<uint8_t> const& message)
+    +[<b>New</b>] OnPublicationMatched(bool const&)
+}
+
+MessageWriter_Create ..> MessageWriter : "C"
+MessageWriter_Create ..> DataWriterStub : "C"
+MessageWriter_Create ..> MiddlewareDataWriterListener : "C"
+
+
+class MessageWriter {
+    + MessageWriter(topic_name)
+    +[<b>New</b>] void SetDependency(std::unique_ptr<IDataWriterStub>&& spDataWriter)
+}
+
+MessageWriter ..|> IMiddlewareWriter
+
+DataWriterStub o-- DomainParticipant
+DataWriterStub o-- Publisher
+MessageWriter_Create -- DomainParticipant
+MessageWriter_Create -- Publisher
+MessageWriter_Create -- TypeSupport
+MessageWriter_Create -- DataWriterQos
+MessageWriter *-- IDataWriterStub
+
+class MiddlewareDataWriterListener <<New>> {
+    + void SetDependency(::middleware::IMiddlewareWriter* pMiddlewareWriter)
+}
+MiddlewareDataWriterListener ..|> DataWriterListener
+MiddlewareDataWriterListener o-- IMiddlewareWriter
+!endif
+
+@enduml

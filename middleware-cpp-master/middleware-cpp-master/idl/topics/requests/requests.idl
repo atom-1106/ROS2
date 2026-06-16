@@ -1,0 +1,21 @@
+// Copyright (C) Caterpillar Inc. All rights reserved.
+// File: requests.idl
+// Description: Defines the data transferred between a DDS RPC Client/Server and its interface.
+
+module cat {
+	module middleware {
+			module dds {
+			struct TransferData {
+				sequence<octet> protobuf;
+			};
+			exception RequestException {
+        		uint32 status_code;
+				TransferData request;
+			};
+			interface Requests {
+				TransferData Read(in TransferData req) raises (RequestException);
+				TransferData Write(in TransferData req) raises (RequestException);
+			};
+		};
+	};
+};

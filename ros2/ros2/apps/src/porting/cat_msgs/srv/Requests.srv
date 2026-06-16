@@ -1,0 +1,13 @@
+
+# this is common request/response for Read and Write
+
+# Request
+RequestType req_type        # identifies READ / WRITE operation
+TransferData req
+
+---
+
+# Response
+uint32 status_code
+TransferData res
+bool success

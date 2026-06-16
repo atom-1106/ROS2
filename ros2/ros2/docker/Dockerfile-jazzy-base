@@ -1,0 +1,3 @@
+FROM ros:jazzy-ros-base
+
+RUN echo "source /app/ros2_demo/script/environment.sh" >> ~/.bashrc

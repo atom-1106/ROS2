@@ -1,0 +1,13 @@
+// Copyright (C) Caterpillar Inc. All rights reserved.
+// File: message.idl
+// Description: Defines the protobuf message sent from a DDS Publisher to a DDS Subscriber.
+
+module cat {
+	module middleware {
+		struct Message {
+			string additional_information;
+			// Criteria: Can not exceed 4MB
+			sequence<octet> protobuf;
+		};
+	};
+};

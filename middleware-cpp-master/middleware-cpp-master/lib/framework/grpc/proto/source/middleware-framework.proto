@@ -1,0 +1,58 @@
+//******************************************************************************
+// Copyright (C) Caterpillar Inc. All rights reserved.
+// Caterpillar: Confidential Yellow
+// -----------------------------------------------------------------------------
+// File name: middleware-framework.proto
+//
+// Description: Defines the transactional communication layer and data for A7
+// Middleware
+//
+//******************************************************************************/
+
+syntax = "proto3";
+package cat.middleware.grpc;
+
+message Status {
+    enum Code {
+        STATUS_CODE_UNSPECIFIED                 = 0;
+        STATUS_CODE_SUCCESS                     = 1;
+        STATUS_CODE_STANDARD_FAILURE            = 2;
+        STATUS_CODE_REQUESTED_NOT_FOUND_FAILURE = 3;
+        STATUS_CODE_EMPTY_REQUEST_FAILURE       = 4;
+        STATUS_CODE_SERVER_NOT_AVAILABLE        = 5;
+        STATUS_CODE_NOT_AUTHORIZED_ERROR        = 6;
+        STATUS_CODE_TIMEOUT_ERROR               = 7;
+        STATUS_CODE_REQUEST_FORMAT_ERROR        = 8;
+        STATUS_CODE_SERVER_INTERNAL_ERROR       = 9;
+        STATUS_CODE_CLIENT_REQUEST_SIZE_ERROR   = 10;
+        STATUS_CODE_SERVER_NO_REPLY_ERROR     = 11;
+    }
+    Code status_code      = 1;
+    string status_message = 2;
+}
+message SerializedProtobuf {
+    string identity = 1;
+    bytes protobuf  = 2;
+}
+
+message None {}
+message Request {
+    string client_identity  = 1;
+    uint32 timeout_ms       = 2;
+    SerializedProtobuf data = 3;
+}
+message Reply {
+    string client_identity  = 1;
+    Status status           = 2;
+    SerializedProtobuf data = 3;
+}
+service Framework {
+    // Async Transactional Request for reading data from a Data Owner
+    rpc Read(Request) returns (Reply);
+    rpc Write(Request) returns (Reply);
+    // Async Transactional Request for server status
+    rpc Ping(None) returns (Status);
+
+    // Async Subscription
+    rpc Subscribe(SerializedProtobuf) returns (stream SerializedProtobuf);
+}

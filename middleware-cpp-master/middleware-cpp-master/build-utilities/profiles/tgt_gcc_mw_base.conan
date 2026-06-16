@@ -1,0 +1,4 @@
+
+[buildenv]
+CONAN_RUN_UNIT_TESTS=False
+

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<configuration>
+    <publishers rate_ms="100">
+        <parameter name="Parameter1" min="0" max="10" />
+        <parameter name="Parameter2" min="20" max="30" />
+        <parameter name="Parameter3" min="40" max="50" />
+    </publishers>
+    <subscribers>
+        <parameter name="Parameter1" />
+        <parameter name="Parameter2" />
+        <parameter name="Parameter3" />
+    </subscribers>
+</configuration>

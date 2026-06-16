@@ -1,0 +1,3 @@
+{% set mw_base_profile = os.path.realpath(profile_dir + '/../../tgt_gcc_mw_base.conan') %}
+include({{mw_base_profile}})
+include(tgt_gcc_arm64_guest_cmake_debug)

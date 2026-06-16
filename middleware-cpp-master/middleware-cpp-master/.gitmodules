@@ -1,0 +1,9 @@
+[submodule "external/development-tools"]
+	path = external/development-tools
+	url = git@gitgis.ecorp.cat.com:es-csf-core-info/info-services/development-tools.git
+[submodule "external/middleware-proto"]
+	path = external/middleware-proto
+	url = git@gitgis.ecorp.cat.com:es-csf-core-info/info-services/middleware-proto.git
+[submodule "external/core_telematics_bin"]
+	path = external/core_telematics_bin
+	url = git@git1.corp.cat.com:/cat/ess-info/core_telematics_bin

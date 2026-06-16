@@ -1,0 +1,260 @@
+@startuml MiddlewareRpcDesign
+header
+    <font color=red>Copyright (C) Caterpillar Inc. All rights reserved</font>
+    File name: middleware-rpc.puml
+    Description: This file contains designs for Fast DDS RPC adoption.
+endheader
+
+
+skinparam linetype ortho
+
+skinparam class {
+    BackgroundColor<<Changed>> LightGreen
+    BackgroundColor<<New>> LightBlue
+    BackgroundColor<<Removed>> LightPink
+    BackgroundColor<<Future>> LightGray
+}
+
+skinparam interface {
+    BackgroundColor<<Changed>> LightGreen
+    BackgroundColor<<New>> LightBlue
+    BackgroundColor<<Removed>> LightPink
+    BackgroundColor<<Future>> LightGray
+}
+
+title Middleware Read/Write RPC
+
+
+namespace eprosima {
+    class RequesterQos
+    class ReplierQos
+    class DomainParticipant {
+        + ReturnCode_t delete_contained_entities()
+    }
+    class DomainParticipantFactory {
+        + ReturnCode_t delete_participant(DomainParticipant*)
+    }
+    class RpcServer
+    class RpcFuture
+    class RpcRequest
+
+    DomainParticipant ..o DomainParticipantFactory : "C"
+    DomainParticipant --o RpcServer : "Uses"
+    ReplierQos --o RpcServer : "Uses"
+
+}
+
+namespace idl {
+    class TransferData {
+        + vector<uint8_t> protobuf
+    }
+    exception RequestException {
+        + uint32_t status_code
+        + TransferData request
+    }
+    interface Request {
+        + RpcFuture<TransferData> Read(TransferData request)
+        + RpcFuture<TransferData> Write(TransferData request)
+    }
+    interface RequestServer_IServerImplementation {
+        + TransferData Read(RpcRequest, TransferData req)
+        + TransferData Write(RpcRequest, TransferData req)
+    }
+    TransferData --o Request
+    TransferData --o RequestServer_IServerImplementation
+    .eprosima.DomainParticipant --o Request
+    .eprosima.RequesterQos --o Request
+    .eprosima.RpcFuture --o Request
+    .eprosima.RpcRequest --o RequestServer_IServerImplementation
+}
+
+namespace common {
+    enum StatusCode {
+        STATUS_CODE_UNSPECIFIED,
+	    STATUS_CODE_SUCCESS,
+	    STATUS_CODE_SERVER_NOT_AVAILABLE,
+	    STATUS_CODE_CLIENT_TIMEOUT_ERROR,
+	    STATUS_CODE_SERVER_TIMEOUT_ERROR,
+	    STATUS_CODE_SERVER_RETURNED_NONE,
+	    STATUS_CODE_REQUEST_FORMAT_ERROR,
+	    STATUS_CODE_REPLY_FORMAT_ERROR,
+        STATUS_CODE_CLIENT_REQUEST_SIZE_ERROR,
+        STATUS_CODE_SERVER_NO_REPLY_ERROR,
+        STATUS_CODE_SERVER_INTERNAL_ERROR,
+    }
+    struct Status {
+	    StatusCode status_code{STATUS_CODE_UNSPECIFIED};
+	    std::string status_message{};
+    }
+    StatusCode --o Status
+
+    struct Request {
+        std::vector<uint8_t> serialized_protobuf{};
+    }
+    struct Reply {
+        Status status{};
+        std::vector<uint8_t> serialized_protobuf{};
+    }
+    StatusCode --o Reply
+
+    class common_types <<stereotype>> {
+        + using OnRequestCallback = std::function<Reply(Request const&)
+        + using OnCompleteCallback = std::function<void(Reply const&)
+    }
+    
+}
+namespace middleware {
+    interface IClientRpcStub <<New>> {
+        + virtual ~IClientRpcStub() = default;
+        + virtual std::weak_ptr<Request> GetInstance() = 0;
+    }
+    interface IServerRpcStub <<New>> {
+        + virtual ~IServerRpcStub() = default;
+        + virtual void Run() = 0;
+        + virtual void Stop() = 0;
+    }
+
+    class ClientRpcStub <<New>> {
+        + ClientRpcStub(domain_id, service, qos)
+        + virtual ~ClientRpcStub() override;
+        + std::weak_ptr<::cat::middleware::dds::Request> GetInstance() override;
+
+        - ::eprosima::fastdds::dds::RequesterQos m_qos;
+        - std::shared_ptr<::eprosima::fastdds::dds::DomainParticipantFactory> m_spFactory;
+        - ::eprosima::fastdds::dds::DomainParticipant* m_pParticipant;
+        - std::shared_ptr<Request> m_spClient;
+    }
+    ClientRpcStub ..|> IClientRpcStub
+    .eprosima.DomainParticipantFactory --o ClientRpcStub
+    .eprosima.DomainParticipant ..* ClientRpcStub : "C"
+    .eprosima.RequesterQos --* ClientRpcStub
+    .idl.Request ..* ClientRpcStub : "C"
+    .eprosima.RpcFuture --o ClientRpcStub
+
+    class ServerRpcStub <<New>> {
+        + ServerRpcStub(domain_id, service, thread_pool_size, qos, std::unique_ptr<RequestServer_IServerImplementation>&& spImpl)
+        + virtual ~ServerRpcStub() override;
+        + void Run() override;
+        + void Stop() override;
+
+        - ::eprosima::fastdds::dds::ReplierQos m_qos;
+	    - std::shared_ptr<::cat::middleware::dds::RequestServer_IServerImplementation> m_spServerImpl;
+        - std::shared_ptr<::eprosima::fastdds::dds::DomainParticipantFactory> m_spFactory;
+        - ::eprosima::fastdds::dds::DomainParticipant* m_pParticipant;
+        - std::shared_ptr<::eprosima::fastdds::dds::rpc::RpcServer> m_spServer;
+    }
+
+    ServerRpcStub ..|> IServerRpcStub
+    .eprosima.DomainParticipantFactory --o ServerRpcStub
+    .eprosima.DomainParticipant ..* ServerRpcStub : "C"
+    .eprosima.ReplierQos --* ServerRpcStub
+    .eprosima.RpcServer ..* ServerRpcStub : "C"
+    .idl.IServerImplementation --* ServerRpcStub
+
+    interface IThreadPool <<New>> {
+    	+ virtual ~IThreadPool() = default;
+        + virtual void Add(std::function<void()>&&) = 0;
+        + virtual void Stop() = 0;
+    }
+    class ThreadPool <<New>> {
+        + ThreadPool(thread_pool_size)
+        + virtual ~ThreadPool() override;
+        + void Add(std::function<void()>&&) override;
+        + void Stop() override;
+        - ::boost::asio::thread_pool m_ThreadPool;
+    }
+    ThreadPool ..|> IThreadPool
+    .boost.thread_pool ..* ThreadPool : "C"
+
+    interface IMiddlewareClient <<Changed>> {
+        --original--
+        + using OnReply                = std::function<void(Reply const&)>;
+        + virtual bool ServerAvailable(string source) = 0;
+        + virtual bool Read(string source, protobuf::Message message, OnReply&& on_complete) = 0;
+        + virtual bool Write(string source, protobuf::Message message, OnReply&& on_complete) = 0;
+        --Changed--
+        + virtual void Read(protobuf::Message message, OnCompleteCallback&& on_complete) = 0;
+        + virtual void Write(protobuf::Message message, OnCompleteCallback&& on_complete) = 0;
+    }
+    .common.common_types --o IMiddlewareClient
+
+    class MiddlewareClient <<New>> {
+        + MiddlewareClient(name, timeout_duration, std::unique_ptr<IClientRpcStub>&&, std::unique_ptr<IThreadPool>&&)
+        + void Read(protobuf::Message message, OnCompleteCallback&& on_complete) override;
+        + void Write(protobuf::Message message, OnCompleteCallback&& on_complete) override;
+
+        - const std::string m_name;
+        - const std::chrono::milliseconds m_timeout;
+        - std::unique_ptr<IClientRpcStub> m_spClientStub
+        - std::unique_ptr<IThreadPool> m_spThreadPool;
+
+        --note--
+        m_spThreadPool Adds new worker thread that calls to m_spClientStub->GetInstance()->Read/Write
+        then does a RpcFuture wait. Callback is passed into worker thread
+        to call later.
+    }
+
+    MiddlewareClient ..|> IMiddlewareClient
+    IClientRpcStub --* MiddlewareClient
+    IThreadPool --* MiddlewareClient
+
+    class ServerRequestHandler <<New>> {
+        + ServerRequestHandler(OnRequestCallback&& on_reads, OnRequestCallback&& on_writes)
+        + TransferData Read(RpcRequest, TransferData req) override;
+        + TransferData Write(RpcRequest, TransferData req) override;
+
+        - OnRequestCallback m_readCallback
+        - OnRequestCallback m_writeCallback
+    }
+    ServerRequestHandler ..|> .idl.RequestServer_IServerImplementation
+    .common.Reply --o ServerRequestHandler
+    .common.Request --o ServerRequestHandler
+    .common.common_types --o ServerRequestHandler
+    .eprosima.RpcRequest --o ServerRequestHandler
+    .idl.TransferData --o ServerRequestHandler
+    .idl.RequestException --o ServerRequestHandler
+
+    interface IMiddlewareServer <<Changed>> {
+        --original--
+        + using Reply = std::optional<::middleware::Reply>
+	    + using OnRequest = std::function<Reply(uint_least16_t key, ::middleware::Request const&)>;
+	    + virtual ~IMiddlewareServer()                                            = default;
+	    + virtual std::string Uri() const                                         = 0;
+	    + virtual void Reply(uint16_t key, ::middleware::Reply& middleware_reply) = 0;
+        --Changed--
+        + virtual void Run() = 0;
+        + virtual void Stop() = 0;
+    }
+    class MiddlewareServer <<New>> {
+        + MiddlewareServer(name, std::unique_ptr<IServerRpcStub>&&)
+        + void Run() override;
+        + void Stop() override;
+
+        - const std::string m_name{};
+    	- std::unique_ptr<IServerRpcStub> m_spServerStub
+    	- std::thread m_thread;
+    }
+    MiddlewareServer ..|> IMiddlewareServer
+    IServerRpcStub --* MiddlewareServer
+
+    class FrameworkFactory <<Changed>> {
+        CreateClientParticipant(domain_id,name,sources)
+        CreateServerParticipant(domain_id,name,callback)
+        --changed--
+        CreateClientParticipant(domain_id,name,service,thread_pool_size,timeout)
+        CreateServerParticipant(domain_id,service,thread_pool_size,on_read,on_write)
+    }
+    'Client side
+    .eprosima.RequesterQos ..o FrameworkFactory : "C"
+    ClientRpcStub ..o FrameworkFactory : "C"
+    ThreadPool ..o FrameworkFactory : "C"
+    MiddlewareClient ..o FrameworkFactory : "C"
+    'Server side
+    .common.common_types --o FrameworkFactory
+    .eprosima.ReplierQos ..o FrameworkFactory : "C"
+    ServerRequestHandler ..o FrameworkFactory : "C"
+    ServerRpcStub ..o FrameworkFactory : "C"
+    MiddlewareServer ..o FrameworkFactory : "C"
+}
+
+@enduml

@@ -1,0 +1,12 @@
+/baseline_publisher_node_01:
+  ros__parameters:
+    min: "0"
+    max: "10"
+/baseline_publisher_node_02:
+  ros__parameters:
+    min: "20"
+    max: "30"
+/baseline_publisher_node_03:
+  ros__parameters:
+    min: "40"
+    max: "50"

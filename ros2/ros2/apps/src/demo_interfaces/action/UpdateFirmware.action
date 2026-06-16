@@ -1,0 +1,18 @@
+# GOAL: Start the update
+string firmware_version
+string hardware_module
+bool reboot
+
+---
+
+# RESULT: Final status of the update
+bool update_successful
+string installed_version
+uint32 error_code
+
+---
+
+# FEEDBACK: Progress of the download and installation
+float32 download_progress
+float32 installation_progress
+string current_phase

@@ -1,0 +1,81 @@
+# Backup / Temporary files
+############################
+*.bak
+*.swp
+*.tmp
+*.temp
+*.orig
+*~
+
+# OS generated files
+############################
+Thumbs.db
+.Trashes/
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Boost
+############################
+user-config.jam
+
+# Directories
+############################
+appdata/
+artifacts/
+build/
+
+# CLion
+############################
+.idea/
+
+# Eclipse
+############################
+.project
+
+# Qt Creator
+############################
+*.user
+*.autosave
+
+# Qt Creator
+############################
+*.userprefs
+test-results/
+
+# Visual Studio Code
+############################
+.vscode/*
+#!.vscode/settings.json
+#!.vscode/tasks.json
+#!.vscode/launch.json
+#!.vscode/extensions.json
+
+# CMake
+############################
+CMakeCache.txt
+CMakeFiles
+CMakeLists.txt.user
+CMakeScripts
+CMakeUserPresets.json
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
+# Verities
+############################
+*.verity
+*.verity_verify
+
+# python
+############################
+.venv/
+
+# CI Generated
+############################
+.conan2/

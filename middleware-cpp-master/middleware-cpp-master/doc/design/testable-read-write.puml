@@ -1,0 +1,112 @@
+@startuml
+!include CommonClass.iuml
+header
+    <font color=red>Copyright (C) Caterpillar Inc. All rights reserved</font>
+    File name: MessageReader.puml
+    Description: This file contains designs for MessageReader class.
+endheader
+
+title Testable Read/Write Client/Server
+note "Client creates everything except the WaitSet\n\nRPC is incompatible with Listeners" as note
+note "Server is identical to client with s/Requester/Replier/g" as note2
+
+
+package eprosima {
+    class TypeSupport
+    class ServiceTypeSupport
+    class Service
+    class DataReader
+    class Requester {
+        ReturnCode_t send_request(void* data, RequestInfo info)
+        ReturnCode_t take_reply(...)
+        ReturnCode_t return_loan(...)
+        DataWriter* get_requester_writer()
+        DataReader* get_requester_reader()
+    }
+
+    class Topic
+    class DataReaderQos
+    class DataWriterQos
+    class DomainParticipant {
+        Topic* create_topic(...)
+        ReturnCode_t delete_topic(Topic topic)
+        Service* create_service(string service_name, string service_type_name)
+        ReturnCode_t delete_service(Service* service)
+        Requester* create_service_requester(Service* service, RequesterQos requester_qos)
+        ReturnCode_t delete_service_requester(string service_name, Requester* requester)
+    }
+
+    class WaitSet
+
+    DomainParticipant o-- Topic
+    DomainParticipant *- Service : 1..n
+    ServiceTypeSupport o-- TypeSupport : n..2
+    Service o-- ServiceTypeSupport
+    Service *- Requester : 1..1
+    Requester *- DataReader
+    Requester o-- RequesterQos
+    RequesterQos o-- DataReaderQos
+    RequesterQos o-- DataWriterQos
+    WaitSet o-left DataReader : n..n
+}
+
+'interface IDataReaderStub {
+'    +ReturnCode_t TakeNextSample(void* pMessage, SampleInfo* pInfo)
+'}
+'class DataReaderStub
+
+interface IMiddlewareClient {
+    +bool ServerAvailable(string source)
+    +bool Read(string source, protobuf::Message message, OnReply&& on_complete)
+    +bool Write(string source, protobuf::Message message, OnReply&& on_complete)
+}
+' struct, but only plantuml web supports them
+class QueuedReply {
+    uint64_t key
+    OnReply onComplete
+    optional<Reply> reply
+}
+class IRequesterStub <<New>> {
+    void CreateRegisterStub(ServiceTypeSupport typeSupport)
+    void RegisterEventListener(MiddlewareEventListener waitSet)
+    ReturnCode_t send_request(void* data, RequestInfo info)
+    ReturnCode_t take_reply(...)
+    ReturnCode_t return_loan(...)
+}
+class RequesterStub <<New>> {
+    string server_guid
+    ::eprosima::fastdds::dds::rpc::Service* pService
+    ::eprosima::fastdds::dds::rpc::Requester* pRequester
+}
+' struct, but only plantuml web supports them
+class SourceConnection <<Changed>> {
+    IRequesterStub requester
+    vector<TimestampedValue<QueuedReply>> onCompleteCallbacks
+}
+class MiddlewareEventListener <<New>> {
+    AddCallback(...)
+    RemoveCallback(...)
+    AddDataReader(DataReader* dataReader)
+    RemoveDataReader(DataReader* dataReader)
+}
+class Client {
+    -void GenerateSourceEndpoints(string source)
+    -void TimeoutStaleRequests()
+    -void ReplyRoutine()
+}
+
+IMiddlewareClient <|-- Client
+SourceConnection *- QueuedReply : 1..n
+SourceConnection *-- IRequesterStub
+IRequesterStub -> MiddlewareEventListener
+IRequesterStub <|- RequesterStub
+RequesterStub *-- DomainParticipant
+RequesterStub o-- Service
+RequesterStub o-- Requester
+Client *-- SourceConnection : 1..n
+Client *-- MiddlewareEventListener
+MiddlewareEventListener *-- WaitSet : "C"
+MiddlewareEventListener --> DataReader
+
+
+@enduml

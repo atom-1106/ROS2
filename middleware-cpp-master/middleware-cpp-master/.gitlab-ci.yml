@@ -1,0 +1,254 @@
+stages:
+  - pre-build
+  - build
+  - test
+  - verity
+  - upload
+
+# [Globals]
+variables:
+  FF_USE_FASTZIP: true
+  TRANSFER_METER_FREQUENCY: "1s"
+  PACKAGE_VERSION: "${CI_COMMIT_REF_SLUG}-${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}"
+  CONAN_HOME: "${CI_PROJECT_DIR}/.conan2" # Place into working directory so it may be cached
+  BUILD_PROFILE: "${CI_PROJECT_DIR}/build-utilities/profiles/ubuntu_build.conan"
+  GIT_STRATEGY: none
+  EXPIRES_IN: ""  # Override via GitLab CI/CD variables; defaults to 1y for master, 4w otherwise
+
+image: docker.stuff.ecorp.cat.com/es-csf-core-info/info-services/development-tools/docker/gen7-base-build:12
+
+before_script:
+  - source ${VENV_PATH}/bin/activate
+  - chmod 600 "$SSH_KEY"
+  - eval $(ssh-agent)
+  - ssh-add "$SSH_KEY"
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - printf "Host *\n\tStrictHostKeyChecking=no\nUserKnownHostsFile=/dev/null\n" >> ~/.ssh/config
+  # Git
+  - cd "$CI_PROJECT_DIR"
+  - git init
+  - git remote add origin "git@${CI_SERVER_HOST}:${CI_PROJECT_PATH}.git" || true
+  - git fetch --depth 20 origin "$CI_COMMIT_SHA"
+  - git checkout -q "$CI_COMMIT_SHA"
+  - git remote -v
+  - git submodule update --init --recursive
+  # Remove the remote if it exists between jobs due to cache and other runners
+  - conan remote remove "*" || true
+  - conan remote add cat-e-conan-rel "https://stuff.ecorp.cat.com/artifactory/api/conan/cat-e-conan-rel-local"
+  - conan remote add cat-e-conan-center "https://stuff.ecorp.cat.com/artifactory/api/conan/cat-e-conan-center-dev-local"
+  - conan remote add cat-e-conan-dev "https://stuff.ecorp.cat.com/artifactory/api/conan/cat-e-conan-dev-local"
+  - export CONAN_LOGIN_USERNAME="transient_bogbuilder"
+  - export CONAN_PASSWORD="$CONAN_PASSWORD"
+  - conan remote set-user cat-e-conan-rel "$CONAN_LOGIN_USERNAME"
+  - conan remote set-user cat-e-conan-center "$CONAN_LOGIN_USERNAME"
+  - conan remote set-user cat-e-conan-dev "$CONAN_LOGIN_USERNAME"
+  - git submodule update --init --recursive
+  # Clear Conan Cache
+  - conan remove "*" --lru=3w -c
+  # Common conan settings and profiles
+  - conan config install /shared/conan_config
+  # For verity creation
+  - rm -rf /opt/verity
+  - mkdir -p /opt/verity
+  - ln -s "$SIGNING_KEY" /opt/verity/signing-key.pem
+  - ln -s "$SIGNING_CERT" /opt/verity/signing-cert.pem
+  - ln -s "$SIGNING_PASS" /opt/verity/verity_passphrase
+
+cache:
+  key:
+    files:
+      - ./conanfile.py
+  paths:
+    - .conan2/
+
+# [Jobs]
+##########################PRE-BUILD############################
+# works due to https://gitlab.com/gitlab-org/gitlab/-/merge_requests/107709
+submodule_history_integrity:
+  stage: pre-build
+  script: "$CI_PROJECT_DIR/external/development-tools/static-analysis/misc-ci/check-submodule-history.sh"
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+
+static-analysis:
+  stage: pre-build
+  artifacts:
+    paths:
+      - sa-output
+    when: always
+    expire_in: 1 week
+  script:
+    - rm -rf ../sa-output || true
+    - mkdir ../sa-output
+    - ./scripts/tools/build-pipeline.sh --dry-run --sa-output ../sa-output SA
+  after_script:
+    - mv ../sa-output ./
+
+artifactory-validation:
+  stage: pre-build
+  script: cate_conan_validate "${CI_PROJECT_DIR}/conanfile.py"
+
+##########################BUILD############################
+workstation-debug:
+  stage: build
+  script:
+    - build-utilities/build.sh "${PACKAGE_VERSION}" x86 Debug
+    - build-utilities/create.sh "${PACKAGE_VERSION}" x86 Debug
+  artifacts:
+    name: "build-workstation-debug-${CI_COMMIT_REF_SLUG}-${CI_JOB_ID}-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - artifacts/tgt_gcc_x86_64_ubuntu_workstation/Debug/
+    expire_in: 1 month
+
+workstation-relwithdebinfo:
+  stage: build
+  script:
+    - build-utilities/build.sh "${PACKAGE_VERSION}" x86 RelWithDebInfo
+    - build-utilities/create.sh "${PACKAGE_VERSION}" x86 RelWithDebInfo
+  artifacts:
+    name: "build-workstation-relwithdebinfo-${CI_COMMIT_REF_SLUG}-${CI_JOB_ID}-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - artifacts/tgt_gcc_x86_64_ubuntu_workstation/RelWithDebInfo/
+    expire_in: 1 month
+
+arm64-guest-debug:
+  stage: build
+  script:
+    - build-utilities/build.sh "${PACKAGE_VERSION}" arm64 Debug
+    - build-utilities/create.sh "${PACKAGE_VERSION}" arm64 Debug
+  artifacts:
+    name: "build-arm64-guest-debug-${CI_COMMIT_REF_SLUG}-${CI_JOB_ID}-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - artifacts/tgt_gcc_arm64_guest/Debug/
+    expire_in: 1 month
+
+arm64-guest-relwithdebinfo:
+  stage: build
+  script:
+    - build-utilities/build.sh "${PACKAGE_VERSION}" arm64 RelWithDebInfo
+    - build-utilities/create.sh "${PACKAGE_VERSION}" arm64 RelWithDebInfo
+  artifacts:
+    name: "build-arm64-guest-relwithdebinfo-${CI_COMMIT_REF_SLUG}-${CI_JOB_ID}-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - artifacts/tgt_gcc_arm64_guest/RelWithDebInfo/
+    expire_in: 1 month
+
+##########################TEST############################
+unit-test-debug:
+  stage: test
+  variables:
+    DEPENDENCY_LIBS: "${CI_PROJECT_DIR}/artifacts/tgt_gcc_x86_64_ubuntu_workstation/Debug/conan"
+    TEST_DIR: "${CI_PROJECT_DIR}/artifacts/tgt_gcc_x86_64_ubuntu_workstation/Debug/tests"
+    OUTPUT_FILE: "unit_test_report.xml"
+  needs:
+    - workstation-debug
+  script:
+    - cd "${TEST_DIR}"
+    - export LD_LIBRARY_PATH="${DEPENDENCY_LIBS}"
+    - ./MiddlewareTest --gtest_output="xml:${OUTPUT_FILE}" 
+  artifacts:
+    when: always
+    reports:
+      junit: ${TEST_DIR}/${OUTPUT_FILE}
+    expire_in: 1 week
+
+integration-debug:
+  stage: test
+  variables:
+    DEPENDENCY_LIBS: "${CI_PROJECT_DIR}/artifacts/tgt_gcc_x86_64_ubuntu_workstation/Debug/conan"
+    TEST_DIR: "${CI_PROJECT_DIR}/artifacts/tgt_gcc_x86_64_ubuntu_workstation/Debug/tests"
+    OUTPUT_FILE: "integration_report.xml"
+  needs:
+    - workstation-debug
+  script:
+    - cd "${TEST_DIR}"
+    - export LD_LIBRARY_PATH="${DEPENDENCY_LIBS}"
+    - ./IntegrationTestApp --gtest_output="xml:${OUTPUT_FILE}" 
+  artifacts:
+    when: always
+    reports:
+      junit: ${TEST_DIR}/${OUTPUT_FILE}
+    expire_in: 1 week
+
+unit-test-relwithdebinfo:
+  stage: test
+  variables:
+    DEPENDENCY_LIBS: "${CI_PROJECT_DIR}/artifacts/tgt_gcc_x86_64_ubuntu_workstation/RelWithDebInfo/conan"
+    TEST_DIR: "${CI_PROJECT_DIR}/artifacts/tgt_gcc_x86_64_ubuntu_workstation/RelWithDebInfo/tests"
+    OUTPUT_FILE: "unit_test_report.xml"
+  needs:
+    - workstation-relwithdebinfo
+  script:
+    - cd "${TEST_DIR}"
+    - export LD_LIBRARY_PATH="${DEPENDENCY_LIBS}"
+    - ./MiddlewareTest --gtest_output="xml:${OUTPUT_FILE}" 
+  artifacts:
+    when: always
+    reports:
+      junit: ${TEST_DIR}/${OUTPUT_FILE}
+    expire_in: 1 week
+
+integration-relwithdebinfo:
+  stage: test
+  variables:
+    DEPENDENCY_LIBS: "${CI_PROJECT_DIR}/artifacts/tgt_gcc_x86_64_ubuntu_workstation/RelWithDebInfo/conan"
+    TEST_DIR: "${CI_PROJECT_DIR}/artifacts/tgt_gcc_x86_64_ubuntu_workstation/RelWithDebInfo/tests"
+    OUTPUT_FILE: "integration_report.xml"
+  needs:
+    - workstation-relwithdebinfo
+  script:
+    - cd "${TEST_DIR}"
+    - export LD_LIBRARY_PATH="${DEPENDENCY_LIBS}"
+    - ./IntegrationTestApp --gtest_output="xml:${OUTPUT_FILE}" 
+  artifacts:
+    when: always
+    reports:
+      junit: ${TEST_DIR}/${OUTPUT_FILE}
+    expire_in: 1 week
+
+##########################VERITY############################
+middleware-dev-tools-verity:
+  stage: verity
+  needs:
+    - arm64-guest-debug
+    - arm64-guest-relwithdebinfo
+  script:
+    - scripts/verity/middleware-dev-tools/create.sh
+  artifacts:
+    name: "verity-middleware-dev-tools-${CI_COMMIT_REF_SLUG}-${CI_JOB_ID}-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - artifacts/tgt_gcc_arm64_guest/Debug/verity
+      - artifacts/tgt_gcc_arm64_guest/RelWithDebInfo/verity
+    expire_in: 1 month
+
+##########################UPLOAD############################
+send-to-development:
+  stage: upload
+  needs:
+    - unit-test-debug
+    - unit-test-relwithdebinfo
+    - integration-debug
+    - integration-relwithdebinfo
+    - workstation-debug
+    - workstation-relwithdebinfo
+    - arm64-guest-debug
+    - arm64-guest-relwithdebinfo
+  script:
+    - build-utilities/upload.sh "${PACKAGE_VERSION}" -c
+    - |
+      BUILD_URL="gitgis.ecorp.cat.com/es-csf-core-info/info-services/middleware-cpp/-/pipelines/${CI_PIPELINE_ID}"
+      EXPIRES_IN="${EXPIRES_IN:-$([[ "${PACKAGE_VERSION}" == *"master"* ]] && echo "1y" || echo "4w")}"
+      scripts/tools/set_properties.py \
+        --package cate_middleware \
+        --version "${PACKAGE_VERSION}" \
+        --property BUILD_ID --value "${CI_PIPELINE_ID}" \
+        --property BUILD_URL --value "${BUILD_URL}" \
+        --property EXPIRES_IN --value "${EXPIRES_IN}" \
+        --token "${ARTIFACTORY_TOKEN_FILE}"
+  artifacts:
+    name: "send-to-development-${CI_COMMIT_REF_SLUG}-${CI_JOB_ID}-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - artifacts/package-upload.json 
+    expire_in: 1 week
+

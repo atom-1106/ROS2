@@ -1,0 +1,15 @@
+%YAML 1.2
+---
+launch:
+  - node:
+      pkg: "demo_to_cat"
+      exec: "app_pub_serviceserver_accli"
+      # name: "psa"
+      # namespace: "domain01"
+      # args: "--ros-args --log-level info"
+
+  - node:
+      pkg: "demo_to_cat"
+      exec: "app_pubsub"
+      namespace: "domain01"
+      # ros_args: "--log-level warn"

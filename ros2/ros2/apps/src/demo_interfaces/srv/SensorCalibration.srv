@@ -1,0 +1,10 @@
+# Request
+string sensor_id
+uint32 timeout
+
+---
+
+# Response
+bool is_calibrated
+uint8 error_margin
+string response

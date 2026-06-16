@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+This configuration is expected to be placed in the devvm's /opt/ directory in order to be consumed
+by the libMiddlewareParameterService.so library. If this config does not exist, the built in groups
+will be used. The built in groups match this configuration exactly. The recommendation is to make a
+copy of this file and edit it to the user's needs.
+The attributes are:
+[domain]
+    {name}: The domain name
+    {id}: The domain id
+[parameter]
+    {name}: The name of the parameter
+    {value_type}: The following values are allowed:
+                    - double
+                    - string
+                    - binary
+                    - bool
+                    - unsigned
+
+DISCLAIMER:
+    This file does not get validated in anyway by the libMiddlewareParameterService.so library.
+    Decision making is purely based on whether /opt/PARAMETER_SERVICE_TEST_MODE.xml exists.
+-->
+<domains>
+    <!-- Data Link Data Engine -->
+    <domain name="DataLinkEngine" id="1">
+        <parameter name="Engine Speed" value_type="double" />
+        <parameter name="Bucket Height" value_type="double" />
+        <parameter name="Speed Limit" value_type="double" />
+        <parameter name="Air Filter #1 Restriction" value_type="double" />
+        <parameter name="Air Filter #2 Restriction" value_type="double" />
+        <parameter name="Boost Pressure (Gauge)" value_type="double" />
+        <parameter name="Service Meter Hours" value_type="double" />
+        <parameter name="Service Brake Pedal Position Status" value_type="unsigned" />
+        <parameter name="Delayed Engine Shutdown Status" value_type="unsigned" />
+        <parameter name="Engine Idle Shutdown Installation Status" value_type="bool" />
+        <parameter name="Machine Serial Number" value_type="string" />
+        <parameter name="Software Part Number" value_type="string" />
+        <parameter name="Product ID" value_type="string" />
+    </domain>
+    <!-- Core -->
+    <domain name="CoreTelematics" id="2">
+        <parameter name="GPS Data" value_type="binary" />
+        <parameter name="Radio Status" value_type="binary" />
+        <parameter name="ECM Serial Number" value_type="string" />
+        <parameter name="Hardware Part Number" value_type="string" />
+    </domain>
+    <!-- Display -->
+    <domain name="Display" id="3">
+        <parameter name="Brightness" domain_id="3" domain_name="Display" value_type="unsigned" />
+        <parameter name="Battery Level" domain_id="3" domain_name="Display" value_type="double" />
+        <parameter name="Language" domain_id="3" domain_name="Display" value_type="unsigned" />
+    </domain>
+    <!-- TMSA -->
+    <domain name="TMSA" id="4">
+        <parameter name="Equipment Operating Status" value_type="bool" />
+        <parameter name="Lifetime Operating Hours" value_type="double" />
+        <parameter name="Active Configuration Packages (TMSA)" value_type="binary" />
+    </domain>
+    <!-- Some Blue Key -->
+    <domain name="SomeBlueKey" id="5">
+        <parameter name="User Profile Name" value_type="string" />
+        <parameter name="Profile Ready Status" value_type="binary" />
+        <parameter name="Active Profile Count" value_type="unsigned" />
+    </domain>
+</domains>
