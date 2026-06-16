@@ -4,24 +4,21 @@
 #include "rclcpp/rclcpp.hpp"
 #include "cat_msgs/msg/message.hpp"
 
+#include <string>
+
 namespace cat_apps {
 
 class SubscriberNode : public rclcpp::Node
 {
 public:
-    explicit SubscriberNode(const std::string &node_name, const std::string &topic_name,
-        rclcpp::NodeOptions options);
-
-    ~SubscriberNode();
+  SubscriberNode(const std::string & node_name, const std::string & topic_name);
+  ~SubscriberNode();
 
 private:
-
-    void OnTimer(const std::string &topic_name);
-    void CheckPublisherAndCreateSubscriber(const std::string &topic_name);
-    rclcpp::Subscription<cat_msgs::msg::Message>::SharedPtr m_subscription;
-    rclcpp::TimerBase::SharedPtr m_timer;
+  std::string const m_topic_name;
+  rclcpp::Subscription<cat_msgs::msg::Message>::SharedPtr m_subscription;
 };
 
-}
+}  // namespace cat_apps
 
-#endif /* CAT_APPS_SUBSCRIBER_NODE_H__ */
+#endif  // CAT_APPS_SUBSCRIBER_NODE_H__

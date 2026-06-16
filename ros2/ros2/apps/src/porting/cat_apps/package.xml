@@ -12,6 +12,7 @@
   <depend>pugixml</depend>
   <depend>rclcpp</depend>
   <depend>cat_msgs</depend>
+  <exec_depend>launch_ros</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

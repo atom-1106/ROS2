@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <configuration>
-    <publishers>
-        <node name="baseline_publisher_node_01" topic="baseline_topic_01" rate_ms="100"/>
-        <node name="baseline_publisher_node_02" topic="baseline_topic_02" rate_ms="100"/>
-        <node name="baseline_publisher_node_03" topic="baseline_topic_03" rate_ms="100"/>
+    <publishers rate_ms="100">
+        <parameter name="Parameter1" min="0" max="10" />
+        <parameter name="Parameter2" min="20" max="30" />
+        <parameter name="Parameter3" min="40" max="50" />
     </publishers>
     <subscribers>
-        <node name="baseline_subscriber_node_01" topic="baseline_topic_01"/>
-        <node name="baseline_subscriber_node_02" topic="baseline_topic_02"/>
-        <node name="baseline_subscriber_node_03" topic="baseline_topic_03"/>
+        <parameter name="Parameter1" />
+        <parameter name="Parameter2" />
+        <parameter name="Parameter3" />
     </subscribers>
 </configuration>

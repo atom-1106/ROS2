@@ -1,61 +1,83 @@
 #include "cat_apps/publisher_node.hpp"
-#include "cat_msgs/msg/message.hpp"
+#include "cat_apps/message_codec.hpp"
 
-using namespace std::chrono_literals;
+#include <cstdio>
+#include <utility>
 
 namespace cat_apps {
 
-PublisherNode::PublisherNode(
-    const std::string &node_name,
-    const std::string &topic_name,
-    const uint32_t rate_ms,
-    rclcpp::NodeOptions options)
-: Node(node_name, options), m_currentValue(0), m_topic_name(topic_name), rate_ms(rate_ms)
-{
+namespace {
 
+rclcpp::QoS BaselineQos()
+{
+  rclcpp::QoS qos(1);
+  qos.reliable();
+  qos.transient_local();
+  return qos;
 }
 
-PublisherNode::~PublisherNode() {
-  if(m_timer) {
+}  // namespace
+
+PublisherNode::PublisherNode(
+  const std::string & node_name,
+  const std::string & topic_name,
+  uint32_t min_value,
+  uint32_t max_value)
+: Node(node_name),
+  m_topic_name(topic_name),
+  m_min_value(min_value),
+  m_max_value(max_value),
+  m_current_value(min_value)
+{
+  rclcpp::PublisherOptions pub_options;
+  pub_options.event_callbacks.matched_callback =
+    [topic = m_topic_name](rclcpp::MatchedInfo & info) {
+      if (info.current_count_change == 1) {
+        std::printf("[%s] Connected to subscriber.\n", topic.c_str());
+      } else if (info.current_count_change == -1) {
+        std::printf("[%s] Disconnected from subscriber.\n", topic.c_str());
+      } else {
+        std::printf("[%s] Match error.\n", topic.c_str());
+      }
+    };
+
+  m_publisher = create_publisher<cat_msgs::msg::Message>(m_topic_name, BaselineQos(), pub_options);
+  std::printf("[%s] Publisher created.\n", m_topic_name.c_str());
+}
+
+PublisherNode::~PublisherNode()
+{
+  if (m_timer) {
     m_timer->cancel();
   }
 }
 
-void PublisherNode::StartTimer()
+void PublisherNode::Publish()
 {
-  // Reliability: Reliable, Durability: Transient Local, History: Keep Last, Depth: 1
-  rclcpp::QoS system_qos = rclcpp::QoS(1);
-  system_qos.reliable().transient_local();
+  cat_msgs::msg::Message data;
+  data.additional_information = GetSystemTime();
+  data.protobuf = ToUint32Bytes(m_current_value);
+  m_publisher->publish(data);
 
-  m_publisher = this->create_publisher<cat_msgs::msg::Message>(this->m_topic_name, system_qos);
-  m_timer = this->create_wall_timer(
+  if (m_current_value == m_max_value) {
+    m_current_value = m_min_value;
+  } else {
+    ++m_current_value;
+  }
+}
+
+void PublisherNode::StartTimer(uint32_t rate_ms)
+{
+  m_timer = create_wall_timer(
     std::chrono::milliseconds(rate_ms),
-    [this] {
-            this->OnTimer();
+    [this]() {
+      OnTimer();
     });
 }
 
-
 void PublisherNode::OnTimer()
 {
-    try {
-        if (this->count_subscribers(this->m_topic_name) > 0) {
-            Publish();
-        }
-    }
-    catch (...)
-    {
-        std::cerr << "count subcribers failed\n";
-    }
-
+  Publish();
 }
 
-void PublisherNode::Publish()
-{
-  auto msg = cat_msgs::msg::Message();
-  msg.additional_information = "Hello world!";
-
-  m_publisher->publish(msg);
-}
-
-}
+}  // namespace cat_apps

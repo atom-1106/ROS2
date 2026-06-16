@@ -1,0 +1,18 @@
+%YAML 1.2
+---
+launch:
+  - arg:
+      name: config_file
+      default: $(find-pkg-share cat_apps)/config-example.xml
+      description: Path to baseline pub/sub XML configuration file
+  - arg:
+      name: thread_mode
+      default: '0'
+      description: 'Publisher thread mode: 0 = single loop, 1 = per-topic threads'
+  - node:
+      pkg: cat_apps
+      exec: BaselinePublisher
+      output: screen
+      args:
+        - $(var thread_mode)
+        - $(var config_file)
