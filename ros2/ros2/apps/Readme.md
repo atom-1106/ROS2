@@ -44,19 +44,51 @@ ros2 run cat_apps BaselinePublisher 0 $(ros2 pkg prefix cat_apps)/share/cat_apps
 
 ### Automated Docker build + smoke test
 
+Script: [`scripts/build-and-test-baseline.sh`](scripts/build-and-test-baseline.sh)
+
 After starting GuestOS-Base (see below):
 
 ```bash
 # From host
 docker exec -it GuestOS-Base-${USER} bash /app/ros2_ws/scripts/build-and-test-baseline.sh
 
+# Inside the container
+cd /app/ros2_ws && bash scripts/build-and-test-baseline.sh
+
 # Build only (no smoke test)
-docker exec -it GuestOS-Base-${USER} bash -c 'RUN_SMOKE_TEST=0 /app/ros2_ws/scripts/build-and-test-baseline.sh'
+RUN_SMOKE_TEST=0 bash scripts/build-and-test-baseline.sh
+
+# Incremental rebuild (skip clean)
+CLEAN_BUILD=0 bash scripts/build-and-test-baseline.sh
 ```
 
 The script builds `cat_msgs`, `pugixml`, `cat_apps`, and `process_launcher`, then runs:
 1. Manual subscriber + publisher smoke test (5 seconds)
 2. `ros2 launch cat_apps baseline_pubsub.launch.yaml` smoke test (8 seconds)
+
+Success ends with `=== All checks passed ===`.
+
+#### Script flow
+
+```mermaid
+flowchart TD
+    A[Start script] --> B[Source ROS2 Jazzy]
+    B --> C{CLEAN_BUILD=1?}
+    C -->|Yes| D[Remove build/install for 4 packages]
+    C -->|No| E[colcon build]
+    D --> E
+    E --> F[Source install/setup.bash]
+    F --> G[Verify config + binaries exist]
+    G --> H{RUN_SMOKE_TEST=1?}
+    H -->|No| I[Exit: Build complete]
+    H -->|Yes| J[Run subscriber + publisher 5s]
+    J --> K{Parameter1 received?}
+    K -->|No| L[FAIL exit 1]
+    K -->|Yes| M[ros2 launch 8s]
+    M --> N{Parameter1 in launch log?}
+    N -->|No| L
+    N -->|Yes| O[All checks passed]
+```
 
 ## How to compile/build/test
 
