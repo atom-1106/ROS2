@@ -13,6 +13,4 @@ launch:
       pkg: cat_apps
       exec: BaselinePublisher
       output: screen
-      args:
-        - $(var thread_mode)
-        - $(var config_file)
+      args: '$(var thread_mode) $(var config_file)'

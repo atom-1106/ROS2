@@ -9,5 +9,4 @@ launch:
       pkg: cat_apps
       exec: BaselineSubscriber
       output: screen
-      args:
-        - $(var config_file)
+      args: '$(var config_file)'

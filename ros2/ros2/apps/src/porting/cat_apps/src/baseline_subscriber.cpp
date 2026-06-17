@@ -1,6 +1,8 @@
 #include "cat_apps/subscriber_node.hpp"
 #include "pugixml/pugixml.hpp"
 
+#include <rclcpp/utilities.hpp>
+
 #include <cstdio>
 #include <memory>
 #include <stdexcept>
@@ -9,22 +11,23 @@
 
 int main(int argc, char * argv[])
 {
-  if (argc != 2) {
+  const auto args = rclcpp::init_and_remove_ros_arguments(argc, argv);
+
+  if (args.size() != 2) {
     std::fprintf(stderr, "Pass valid number of arguments\n");
     std::fprintf(stderr, "Usage:\n");
     std::fprintf(stderr, "./BaselineSubscriber <config.xml>\n");
     std::fprintf(stderr, "<config.xml> : configuration file\n");
+    rclcpp::shutdown();
     return -1;
   }
-
-  rclcpp::init(argc, argv);
 
   std::vector<std::shared_ptr<cat_apps::SubscriberNode>> subscribers;
 
   try {
     pugi::xml_document document;
 
-    if (!document.load_file(argv[1])) {
+    if (!document.load_file(args[1].c_str())) {
       throw std::invalid_argument("Could not parse the configuration\n");
     }
 
